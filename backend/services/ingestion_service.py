@@ -4,14 +4,13 @@ import sys
 import os
 import uuid
 
-# Ensure the project root (parent of backend/) is on sys.path so that
-# backend/pipeline/ modules can import from backend/config.py etc.
+# __file__ = backend/services/ingestion_service.py
+# parent    = backend/services/
+# parent²   = backend/
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
 
-for _path in (_BACKEND_DIR, _PROJECT_ROOT):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 
 def run_ingestion_pipeline(
