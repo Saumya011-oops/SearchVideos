@@ -1,0 +1,14 @@
+openai-whisper
+transformers
+torch
+torchvision
+torchaudio
+sentence-transformers
+chromadb
+opencv-python-headless
+Pillow
+ffmpeg-python
+fastapi
+uvicorn[standard]
+pydantic
+accelerate

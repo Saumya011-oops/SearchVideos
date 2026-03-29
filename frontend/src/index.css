@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap');
+
+@import "tailwindcss";
+
+:root {
+  --color-charcoal: #1a1a2e;
+  --color-amber: #e2b340;
+  --color-amber-light: #f0c96a;
+  --color-amber-dark: #c49a2a;
+  --color-teal: #2d6a6a;
+  --color-teal-light: #3d8a8a;
+  --color-cream: #f5f0e8;
+  --color-cream-dark: #ebe4d5;
+  --color-coral: #d4603a;
+  --shadow-warm: 0 4px 24px rgba(226, 179, 64, 0.10);
+  --shadow-warm-md: 0 8px 32px rgba(226, 179, 64, 0.15);
+  --shadow-warm-lg: 0 16px 48px rgba(226, 179, 64, 0.20);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-cream);
+  font-family: 'Outfit', system-ui, sans-serif;
+  color: var(--color-charcoal);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Noise texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-cream-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-amber);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-amber-dark);
+}
+
+/* Heading class */
+.heading {
+  font-family: 'DM Serif Display', Georgia, serif;
+}
+
+/* Shimmer loading animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-cream-dark) 25%,
+    var(--color-cream) 50%,
+    var(--color-cream-dark) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Stage indicator animations */
+@keyframes stage-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.8; }
+}
+
+.animate-stage-pulse {
+  animation: stage-pulse 1.2s ease-in-out infinite;
+}

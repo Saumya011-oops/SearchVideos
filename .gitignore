@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+*.env
+
+# ML model cache
+.cache/
+~/.cache/huggingface/
+
+# Output / processed files
+output/
+storage/
+
+# ChromaDB data
+chroma_data/
+
+# Frontend build
+frontend/dist/
+frontend/node_modules/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+/tmp/
