@@ -20,6 +20,8 @@ build/
 # Output / processed files
 output/
 storage/
+backend/output/
+backend/storage/
 
 # ChromaDB data
 chroma_data/
@@ -27,6 +29,7 @@ chroma_data/
 # Frontend build
 frontend/dist/
 frontend/node_modules/
+frontend/src/assets/hero.png
 
 # macOS
 .DS_Store
