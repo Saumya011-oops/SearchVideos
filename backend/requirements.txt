@@ -6,6 +6,8 @@ alembic
 pydantic-settings
 python-multipart
 python-dotenv
+python-jose[cryptography]
+bcrypt
 yt-dlp
 openai-whisper
 transformers

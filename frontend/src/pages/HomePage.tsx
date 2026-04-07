@@ -279,7 +279,7 @@ export default function HomePage() {
             }}
           >
             {videos.map((video) => (
-              <VideoCard key={video.id} video={video} />
+              <VideoCard key={video.id} video={video} onDeleted={refetch} />
             ))}
           </div>
         )}

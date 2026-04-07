@@ -7,6 +7,7 @@ export interface Video {
   thumbnail_path?: string
   status: 'uploading' | 'processing' | 'ready' | 'failed'
   error_message?: string
+  user_id?: string
   created_at: string
   updated_at: string
 }
@@ -44,4 +45,16 @@ export interface Stats {
   total_videos: number
   total_chunks: number
   total_searches: number
+}
+
+export interface User {
+  id: string
+  username: string
+  email: string
+  created_at: string
+}
+
+export interface AuthResponse {
+  token: string
+  user: User
 }

@@ -1,9 +1,37 @@
 import axios from 'axios'
-import { Video, Chunk, SearchResponse, Stats } from '../types'
+import { Video, Chunk, SearchResponse, Stats, AuthResponse, User } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
 })
+
+// Attach auth token to every request if present
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+export async function register(username: string, email: string, password: string): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>('/auth/register', { username, email, password })
+  return data
+}
+
+export async function login(username: string, password: string): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>('/auth/login', { username, password })
+  return data
+}
+
+export async function getMe(): Promise<User> {
+  const { data } = await api.get<User>('/auth/me')
+  return data
+}
+
+// ── Videos ───────────────────────────────────────────────────────────────────
 
 export async function getVideos(): Promise<Video[]> {
   const { data } = await api.get<Video[]>('/videos')
@@ -47,6 +75,8 @@ export async function getVideoChunks(id: string): Promise<Chunk[]> {
   return data
 }
 
+// ── Search ───────────────────────────────────────────────────────────────────
+
 export async function search(
   query: string,
   videoId?: string,
@@ -62,6 +92,8 @@ export async function search(
   const { data } = await api.post<SearchResponse>('/search', payload)
   return data
 }
+
+// ── Stats & Health ───────────────────────────────────────────────────────────
 
 export async function getStats(): Promise<Stats> {
   const { data } = await api.get<Stats>('/stats')

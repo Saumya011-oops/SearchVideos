@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db, SessionLocal
 from config import settings
-from models.database_models import Video, Chunk, VideoStatus
+from models.database_models import Video, Chunk, VideoStatus, User
 from models.schemas import VideoResponse, ChunkResponse, IngestURLRequest
 from services.video_service import (
     get_video_or_404,
@@ -21,6 +21,7 @@ from services.video_service import (
     delete_video_files,
 )
 from services.ingestion_service import run_ingestion_pipeline
+from auth import get_current_user
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -35,24 +36,24 @@ def _video_to_response(video: Video) -> VideoResponse:
         thumbnail_path=video.thumbnail_path,
         status=video.status.value if hasattr(video.status, "value") else str(video.status),
         error_message=video.error_message,
+        user_id=str(video.user_id) if video.user_id else None,
         created_at=video.created_at.isoformat(),
         updated_at=video.updated_at.isoformat(),
     )
 
 
-# ── Upload a local video file ──────────────────────────────────────────────────
+# ── Upload a local video file ─────────────────────────────────────────────────
 
 @router.post("/upload", response_model=VideoResponse, status_code=201)
 async def upload_video(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Upload a local video file and start background ingestion."""
     storage_dir = get_video_storage_dir()
     safe_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = storage_dir / safe_name
 
-    # Write upload to disk
     contents = await file.read()
     max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
     if len(contents) > max_bytes:
@@ -70,12 +71,12 @@ async def upload_video(
         title=file.filename or safe_name,
         file_path=str(file_path),
         status=VideoStatus.uploading,
+        user_id=current_user.id,
     )
     db.add(video)
     db.commit()
     db.refresh(video)
 
-    # Start background ingestion thread
     thread = threading.Thread(
         target=run_ingestion_pipeline,
         args=(str(video_id), str(file_path), SessionLocal),
@@ -86,14 +87,14 @@ async def upload_video(
     return _video_to_response(video)
 
 
-# ── Ingest from YouTube URL ────────────────────────────────────────────────────
+# ── Ingest from YouTube URL ───────────────────────────────────────────────────
 
 @router.post("/youtube", response_model=VideoResponse, status_code=201)
 def ingest_youtube(
     body: IngestURLRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Download a YouTube video via yt-dlp and start background ingestion."""
     import yt_dlp
 
     storage_dir = get_video_storage_dir()
@@ -114,10 +115,8 @@ def ingest_youtube(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"yt-dlp error: {exc}")
 
-    # yt-dlp may append an extension; find the actual file
     actual_path = output_path
     if not actual_path.exists():
-        # Try common extensions
         for ext in ("mp4", "mkv", "webm"):
             candidate = storage_dir / f"{video_id}.{ext}"
             if candidate.exists():
@@ -130,6 +129,7 @@ def ingest_youtube(
         source_url=body.source_url,
         file_path=str(actual_path),
         status=VideoStatus.uploading,
+        user_id=current_user.id,
     )
     db.add(video)
     db.commit()
@@ -145,32 +145,44 @@ def ingest_youtube(
     return _video_to_response(video)
 
 
-# ── List all videos ────────────────────────────────────────────────────────────
+# ── List videos for current user ──────────────────────────────────────────────
 
-@router.get("/", response_model=List[VideoResponse])
-def list_videos(db: Session = Depends(get_db)):
-    """Return all videos ordered by creation date (newest first)."""
-    videos = db.query(Video).order_by(Video.created_at.desc()).all()
+@router.get("", response_model=List[VideoResponse])
+def list_videos(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    videos = (
+        db.query(Video)
+        .filter(Video.user_id == current_user.id)
+        .order_by(Video.created_at.desc())
+        .all()
+    )
     return [_video_to_response(v) for v in videos]
 
 
-# ── Get single video ───────────────────────────────────────────────────────────
+# ── Get single video ──────────────────────────────────────────────────────────
 
 @router.get("/{video_id}", response_model=VideoResponse)
 def get_video(video_id: str, db: Session = Depends(get_db)):
-    """Return a single video by ID."""
     video = get_video_or_404(video_id, db)
     return _video_to_response(video)
 
 
-# ── Delete video ───────────────────────────────────────────────────────────────
+# ── Delete video ──────────────────────────────────────────────────────────────
 
 @router.delete("/{video_id}")
-def delete_video(video_id: str, db: Session = Depends(get_db)):
-    """Delete video, its chunks, ChromaDB entries, and files."""
+def delete_video(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     video = get_video_or_404(video_id, db)
 
-    # Remove from ChromaDB
+    # Only the owner can delete
+    if video.user_id and str(video.user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to delete this video")
+
     try:
         from pipeline.vector_store import init_store
         collection = init_store()
@@ -178,24 +190,18 @@ def delete_video(video_id: str, db: Session = Depends(get_db)):
     except Exception as exc:
         print(f"[delete] ChromaDB cleanup error (non-fatal): {exc}")
 
-    # Delete chunk records from DB
     db.query(Chunk).filter(Chunk.video_id == video.id).delete()
-
-    # Delete files
     delete_video_files(video)
-
-    # Delete video record
     db.delete(video)
     db.commit()
 
     return {"status": "deleted"}
 
 
-# ── Stream video with Range support ───────────────────────────────────────────
+# ── Stream video ──────────────────────────────────────────────────────────────
 
 @router.get("/{video_id}/stream")
 def stream_video(video_id: str, request: Request, db: Session = Depends(get_db)):
-    """Stream a video file with HTTP Range request support for browser seeking."""
     video = get_video_or_404(video_id, db)
     file_path = Path(video.file_path)
 
@@ -203,9 +209,8 @@ def stream_video(video_id: str, request: Request, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Video file not found on disk")
 
     file_size = file_path.stat().st_size
-    chunk_size = 1 * 1024 * 1024  # 1 MB
+    chunk_size = 1 * 1024 * 1024
 
-    # Detect media type
     mime_type, _ = mimetypes.guess_type(str(file_path))
     if not mime_type:
         mime_type = "video/mp4"
@@ -213,7 +218,6 @@ def stream_video(video_id: str, request: Request, db: Session = Depends(get_db))
     range_header = request.headers.get("Range")
 
     if range_header:
-        # Parse "bytes=start-end"
         try:
             range_val = range_header.replace("bytes=", "").strip()
             start_str, _, end_str = range_val.partition("-")
@@ -245,14 +249,8 @@ def stream_video(video_id: str, request: Request, db: Session = Depends(get_db))
             "Accept-Ranges": "bytes",
             "Content-Length": str(content_length),
         }
-        return StreamingResponse(
-            generate(),
-            status_code=206,
-            headers=headers,
-            media_type=mime_type,
-        )
+        return StreamingResponse(generate(), status_code=206, headers=headers, media_type=mime_type)
     else:
-        # No range header – stream the whole file
         def generate_full():
             with open(file_path, "rb") as f:
                 while True:
@@ -261,23 +259,14 @@ def stream_video(video_id: str, request: Request, db: Session = Depends(get_db))
                         break
                     yield data
 
-        headers = {
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(file_size),
-        }
-        return StreamingResponse(
-            generate_full(),
-            status_code=200,
-            headers=headers,
-            media_type=mime_type,
-        )
+        headers = {"Accept-Ranges": "bytes", "Content-Length": str(file_size)}
+        return StreamingResponse(generate_full(), status_code=200, headers=headers, media_type=mime_type)
 
 
-# ── Get chunks for a video ─────────────────────────────────────────────────────
+# ── Get chunks for a video ────────────────────────────────────────────────────
 
 @router.get("/{video_id}/chunks", response_model=List[ChunkResponse])
 def get_video_chunks(video_id: str, db: Session = Depends(get_db)):
-    """Return all chunks for a video."""
     video = get_video_or_404(video_id, db)
     chunks = (
         db.query(Chunk)

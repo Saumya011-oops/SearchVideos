@@ -26,6 +26,7 @@ from models.database_models import Video, Chunk, SearchHistory
 from models.schemas import HealthResponse, StatsResponse
 from routers import videos as videos_router
 from routers import search as search_router
+from routers import auth as auth_router
 
 # ── Application factory ────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ app.add_middleware(
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 
+app.include_router(auth_router.router)
 app.include_router(videos_router.router)
 app.include_router(search_router.router)
 

@@ -106,3 +106,16 @@ body::before {
 .animate-stage-pulse {
   animation: stage-pulse 1.2s ease-in-out infinite;
 }
+
+/* Video player progress bar — grows on hover for easier scrubbing */
+.progress-bar-track {
+  transition: height 0.15s ease;
+}
+.progress-bar-track:hover {
+  height: 7px !important;
+}
+
+/* Fullscreen video fill */
+:fullscreen {
+  background: #000;
+}

@@ -8,7 +8,7 @@ from services import search_service
 router = APIRouter(prefix="/api/search", tags=["search"])
 
 
-@router.post("/", response_model=SearchResponse)
+@router.post("", response_model=SearchResponse)
 def search(body: SearchRequest, db: Session = Depends(get_db)):
     """Search for video chunks matching the given query."""
     results = search_service.search_videos(

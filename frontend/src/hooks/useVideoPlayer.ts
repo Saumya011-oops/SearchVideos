@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useCallback } from 'react'
 
 export function useVideoPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -6,37 +6,53 @@ export function useVideoPlayer() {
   const [duration, setDuration] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
+  const [muted, setMuted] = useState(false)
 
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    const onTime = () => setCurrentTime(video.currentTime)
-    const onDuration = () => setDuration(video.duration)
-    const onPlay = () => setPlaying(true)
-    const onPause = () => setPlaying(false)
-    video.addEventListener('timeupdate', onTime)
-    video.addEventListener('loadedmetadata', onDuration)
-    video.addEventListener('play', onPlay)
-    video.addEventListener('pause', onPause)
-    return () => {
-      video.removeEventListener('timeupdate', onTime)
-      video.removeEventListener('loadedmetadata', onDuration)
-      video.removeEventListener('play', onPlay)
-      video.removeEventListener('pause', onPause)
-    }
+  // React synthetic event handlers — wired directly to <video> element props
+  // so they fire regardless of when the element mounts (fixes 0:00 / play-state bugs)
+  const handleTimeUpdate = useCallback((time: number) => setCurrentTime(time), [])
+  const handleDuration = useCallback((dur: number) => {
+    if (isFinite(dur) && !isNaN(dur) && dur > 0) setDuration(dur)
   }, [])
+  const handlePlay = useCallback(() => setPlaying(true), [])
+  const handlePause = useCallback(() => setPlaying(false), [])
+  const handleEnded = useCallback(() => setPlaying(false), [])
 
   const seekTo = useCallback((time: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time
-      videoRef.current.play()
+      videoRef.current.play().catch(() => {})
     }
   }, [])
 
+  // Reads paused state directly from the element — avoids stale closure
   const togglePlay = useCallback(() => {
-    if (!videoRef.current) return
-    playing ? videoRef.current.pause() : videoRef.current.play()
-  }, [playing])
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) {
+      video.play().catch(() => {})
+    } else {
+      video.pause()
+    }
+  }, [])
+
+  const skipForward = useCallback((seconds = 10) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.min(
+        videoRef.current.currentTime + seconds,
+        videoRef.current.duration || Infinity
+      )
+    }
+  }, [])
+
+  const skipBackward = useCallback((seconds = 10) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(
+        videoRef.current.currentTime - seconds,
+        0
+      )
+    }
+  }, [])
 
   const changeRate = useCallback((rate: number) => {
     if (videoRef.current) {
@@ -45,5 +61,16 @@ export function useVideoPlayer() {
     }
   }, [])
 
-  return { videoRef, currentTime, duration, playing, playbackRate, seekTo, togglePlay, changeRate }
+  const toggleMute = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted
+      setMuted(videoRef.current.muted)
+    }
+  }, [])
+
+  return {
+    videoRef, currentTime, duration, playing, playbackRate, muted,
+    seekTo, togglePlay, skipForward, skipBackward, changeRate, toggleMute,
+    handleTimeUpdate, handleDuration, handlePlay, handlePause, handleEnded,
+  }
 }

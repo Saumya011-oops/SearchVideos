@@ -13,7 +13,34 @@ class VideoStatus(str, enum.Enum):
     failed = "failed"
 
 
-# ── Video schemas ──────────────────────────────────────────────────────────────
+# ── Auth schemas ──────────────────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=100)
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    email: str
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserResponse
+
+
+# ── Video schemas ─────────────────────────────────────────────────────────────
 
 class VideoBase(BaseModel):
     title: str
@@ -40,13 +67,14 @@ class VideoResponse(BaseModel):
     thumbnail_path: Optional[str] = None
     status: str
     error_message: Optional[str] = None
+    user_id: Optional[str] = None
     created_at: str
     updated_at: str
 
     model_config = {"from_attributes": True}
 
 
-# ── Chunk schemas ──────────────────────────────────────────────────────────────
+# ── Chunk schemas ─────────────────────────────────────────────────────────────
 
 class ChunkResponse(BaseModel):
     id: str
@@ -60,13 +88,13 @@ class ChunkResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Ingestion schemas ──────────────────────────────────────────────────────────
+# ── Ingestion schemas ─────────────────────────────────────────────────────────
 
 class IngestURLRequest(BaseModel):
     source_url: str
 
 
-# ── Search schemas ─────────────────────────────────────────────────────────────
+# ── Search schemas ────────────────────────────────────────────────────────────
 
 class SearchRequest(BaseModel):
     query: str
@@ -93,7 +121,7 @@ class SearchResponse(BaseModel):
     total_results: int
 
 
-# ── Utility schemas ────────────────────────────────────────────────────────────
+# ── Utility schemas ───────────────────────────────────────────────────────────
 
 class StatsResponse(BaseModel):
     total_videos: int

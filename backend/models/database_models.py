@@ -6,6 +6,7 @@ from sqlalchemy import (
     Column, String, Float, Text, DateTime, Enum, Integer, ForeignKey
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from database import Base
 
@@ -15,6 +16,18 @@ class VideoStatus(enum.Enum):
     processing = "processing"
     ready = "ready"
     failed = "failed"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username = Column(String(100), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    videos = relationship("Video", back_populates="owner", cascade="all, delete-orphan")
 
 
 class Video(Base):
@@ -28,6 +41,7 @@ class Video(Base):
     thumbnail_path = Column(String(1000), nullable=True)
     status = Column(Enum(VideoStatus), default=VideoStatus.uploading, nullable=False)
     error_message = Column(Text, nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime,
@@ -35,6 +49,8 @@ class Video(Base):
         onupdate=datetime.utcnow,
         nullable=False,
     )
+
+    owner = relationship("User", back_populates="videos")
 
 
 class Chunk(Base):
@@ -61,4 +77,5 @@ class SearchHistory(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     query = Column(Text, nullable=False)
     results_count = Column(Integer, nullable=False, default=0)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
